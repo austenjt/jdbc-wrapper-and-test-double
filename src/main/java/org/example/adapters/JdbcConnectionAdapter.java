@@ -11,6 +11,9 @@ public class JdbcConnectionAdapter implements DatabaseConnection {
     private final Connection connection;
 
     public JdbcConnectionAdapter(Connection connection) {
+        if (connection == null) {
+            throw new NullPointerException("Connection cannot be null");
+        }
         this.connection = connection;
     }
 
