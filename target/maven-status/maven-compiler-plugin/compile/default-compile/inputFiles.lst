@@ -1,0 +1,8 @@
+/Users/austenjt/IdeaProjects/jdbc-wrapper-and-test-double/src/main/java/org/example/JdbcWrapper.java
+/Users/austenjt/IdeaProjects/jdbc-wrapper-and-test-double/src/main/java/org/example/Main.java
+/Users/austenjt/IdeaProjects/jdbc-wrapper-and-test-double/src/main/java/org/example/adapters/JdbcConnectionAdapter.java
+/Users/austenjt/IdeaProjects/jdbc-wrapper-and-test-double/src/main/java/org/example/adapters/JdbcResultSetAdapter.java
+/Users/austenjt/IdeaProjects/jdbc-wrapper-and-test-double/src/main/java/org/example/adapters/JdbcStatementAdapter.java
+/Users/austenjt/IdeaProjects/jdbc-wrapper-and-test-double/src/main/java/org/example/interfaces/DatabaseConnection.java
+/Users/austenjt/IdeaProjects/jdbc-wrapper-and-test-double/src/main/java/org/example/interfaces/DatabaseResultSet.java
+/Users/austenjt/IdeaProjects/jdbc-wrapper-and-test-double/src/main/java/org/example/interfaces/DatabaseStatement.java

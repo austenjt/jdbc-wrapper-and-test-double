@@ -1,0 +1,9 @@
+org/example/adapters/JdbcResultSetAdapter.class
+org/example/adapters/JdbcStatementAdapter.class
+org/example/Main.class
+org/example/adapters/JdbcConnectionAdapter.class
+org/example/interfaces/DatabaseResultSet.class
+org/example/JdbcWrapper.class
+org/example/interfaces/DatabaseStatement.class
+org/example/JdbcWrapper$ResultSetMapper.class
+org/example/interfaces/DatabaseConnection.class

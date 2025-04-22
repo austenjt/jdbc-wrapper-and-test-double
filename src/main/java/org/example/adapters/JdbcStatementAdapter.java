@@ -11,6 +11,9 @@ public class JdbcStatementAdapter implements DatabaseStatement {
     private final PreparedStatement statement;
 
     public JdbcStatementAdapter(PreparedStatement statement) {
+        if (statement == null) {
+            throw new NullPointerException("Cannot initialize JdbcStatementAdapter with a null PreparedStatement");
+        }
         this.statement = statement;
     }
 
