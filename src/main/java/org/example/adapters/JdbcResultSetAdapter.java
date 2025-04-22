@@ -10,6 +10,9 @@ public class JdbcResultSetAdapter implements DatabaseResultSet {
     private final ResultSet resultSet;
 
     public JdbcResultSetAdapter(ResultSet resultSet) {
+        if (resultSet == null) {
+            throw new NullPointerException("ResultSet cannot be null");
+        }
         this.resultSet = resultSet;
     }
 

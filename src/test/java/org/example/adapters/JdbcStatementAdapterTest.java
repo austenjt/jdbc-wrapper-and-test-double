@@ -1,7 +1,5 @@
-package org.example;
+package org.example.adapters;
 
-import org.example.adapters.JdbcResultSetAdapter;
-import org.example.adapters.JdbcStatementAdapter;
 import org.example.interfaces.DatabaseResultSet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
