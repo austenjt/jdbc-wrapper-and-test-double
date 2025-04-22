@@ -69,6 +69,7 @@ public class JdbcConnectionAdapterTest {
         });
     }
 
+    //TODO these tests just need a little work to fix them
 //    @Test
 //    void testPrepareStatement_SQLException_Propagates() {
 //        assertDoesNotThrow(() -> {
