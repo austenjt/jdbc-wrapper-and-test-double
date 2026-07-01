@@ -1,7 +1,5 @@
 package org.example;
 
-import org.example.adapters.JdbcConnectionAdapter;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -19,7 +17,7 @@ public class Main {
         String password = "";
 
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
-             JdbcWrapper wrapper = new JdbcWrapper(new JdbcConnectionAdapter(conn))) {
+             JdbcWrapper wrapper = new JdbcWrapper(conn)) {
             // Initialize the database: create a table and insert sample data
             initializeDatabase(conn);
 

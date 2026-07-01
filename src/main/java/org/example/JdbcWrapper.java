@@ -1,18 +1,25 @@
 package org.example;
 
-import org.example.interfaces.DatabaseConnection;
-import org.example.interfaces.DatabaseResultSet;
-import org.example.interfaces.DatabaseStatement;
-
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A thin, ergonomic wrapper over a JDBC {@link Connection}.
+ *
+ * <p>Because {@code java.sql.Connection}, {@code PreparedStatement}, and
+ * {@code ResultSet} are already interfaces, there is no need for a hand-rolled
+ * adapter layer to make this testable. The recommended test double is a real
+ * in-memory database (H2) rather than a mock &mdash; see {@code JdbcWrapperTest}.
+ */
 public class JdbcWrapper implements AutoCloseable {
 
-    private final DatabaseConnection connection;
+    private final Connection connection;
 
-    public JdbcWrapper(DatabaseConnection connection) {
+    public JdbcWrapper(Connection connection) {
         if (connection == null) {
             throw new IllegalArgumentException("Connection cannot be null");
         }
@@ -21,9 +28,9 @@ public class JdbcWrapper implements AutoCloseable {
 
     public <T> List<T> executeQuery(String query, List<Object> parameters, ResultSetMapper<T> mapper) throws SQLException {
         List<T> results = new ArrayList<>();
-        try (DatabaseStatement stmt = connection.prepareStatement(query)) {
+        try (PreparedStatement stmt = connection.prepareStatement(query)) {
             setParameters(stmt, parameters);
-            try (DatabaseResultSet rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     results.add(mapper.map(rs));
                 }
@@ -33,29 +40,31 @@ public class JdbcWrapper implements AutoCloseable {
     }
 
     public int executeUpdate(String query, List<Object> parameters) throws SQLException {
-        try (DatabaseStatement stmt = connection.prepareStatement(query)) {
+        try (PreparedStatement stmt = connection.prepareStatement(query)) {
             setParameters(stmt, parameters);
             return stmt.executeUpdate();
         }
     }
 
+    @Override
     public void close() throws SQLException {
         if (!connection.isClosed()) {
             connection.close();
         }
     }
 
-    private void setParameters(DatabaseStatement stmt, List<Object> parameters) throws SQLException {
+    private void setParameters(PreparedStatement stmt, List<Object> parameters) throws SQLException {
         if (parameters != null) {
             for (int i = 0; i < parameters.size(); i++) {
-                stmt.setParameter(i + 1, parameters.get(i));
+                stmt.setObject(i + 1, parameters.get(i));
             }
         }
     }
 
+    /** Maps a single row of a {@link ResultSet} to a domain object. */
     @FunctionalInterface
     public interface ResultSetMapper<T> {
-        T map(DatabaseResultSet rs) throws SQLException;
+        T map(ResultSet rs) throws SQLException;
     }
 
 }

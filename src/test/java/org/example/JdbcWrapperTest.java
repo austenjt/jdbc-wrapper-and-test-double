@@ -1,128 +1,161 @@
 package org.example;
 
-import org.example.interfaces.DatabaseConnection;
-import org.example.interfaces.DatabaseResultSet;
-import org.example.interfaces.DatabaseStatement;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Arrays;
+import java.sql.Statement;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-public class JdbcWrapperTest {
+/**
+ * Tests {@link JdbcWrapper} against a real in-memory H2 database used as a
+ * <em>test double</em> (a "fake"), rather than a mocked JDBC stack.
+ *
+ * <p>Why a fake instead of Mockito mocks: the mock-based approach forced us to
+ * hand-write parallel interfaces and adapters purely so they could be stubbed,
+ * and the resulting tests only re-asserted our own {@code when(...).thenReturn(...)}
+ * wiring &mdash; they never proved a single line of SQL was valid. Running against
+ * a real database exercises real SQL, real parameter binding, and real
+ * {@link SQLException}s, with no boilerplate. H2 runs in-memory so it is fast
+ * enough for the unit-test loop and needs no Docker.
+ *
+ * <p>H2 runs in PostgreSQL compatibility mode so the SQL stays close to a
+ * production Postgres/SQL-Server target. Each test gets its own uniquely-named
+ * in-memory database for full isolation.
+ */
+@DisplayName("JdbcWrapper (backed by an in-memory H2 fake)")
+class JdbcWrapperTest {
 
-    @Mock
-    private DatabaseConnection connection;
-
-    @Mock
-    private DatabaseStatement statement;
-
-    @Mock
-    private DatabaseResultSet resultSet;
-
-    private JdbcWrapper jdbcWrapper;
+    private Connection connection;
+    private JdbcWrapper wrapper;
 
     @BeforeEach
-    void setUp() {
-        jdbcWrapper = new JdbcWrapper(connection);
+    void setUp() throws SQLException {
+        // Unique DB name per test => no cross-test bleed. DB_CLOSE_DELAY=-1 keeps
+        // the in-memory DB alive for the lifetime of this connection.
+        String url = "jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
+        connection = DriverManager.getConnection(url, "sa", "");
+        seed(connection);
+        wrapper = new JdbcWrapper(connection);
+    }
+
+    @AfterEach
+    void tearDown() throws SQLException {
+        if (connection != null && !connection.isClosed()) {
+            connection.close();
+        }
+    }
+
+    private static void seed(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(255), age INT)");
+            stmt.execute("INSERT INTO users (id, name, age) VALUES (1, 'John Doe', 25)");
+            stmt.execute("INSERT INTO users (id, name, age) VALUES (2, 'Alice Smith', 30)");
+            stmt.execute("INSERT INTO users (id, name, age) VALUES (3, 'Bob Jones', 18)");
+        }
     }
 
     @Test
-    void testExecuteQuery_Success() {
-        // Arrange
-        String query = "SELECT * FROM users WHERE id = ?";
-        List<Object> parameters = Arrays.asList(1);
-        JdbcWrapper.ResultSetMapper<String> mapper = rs -> rs.getString("name");
-        assertDoesNotThrow(() -> {
-            when(connection.prepareStatement(query)).thenReturn(statement);
-            when(statement.executeQuery()).thenReturn(resultSet);
-            when(resultSet.next()).thenReturn(true, false);
-            when(resultSet.getString("name")).thenReturn("John Doe");
+    @DisplayName("executeQuery returns rows matching the bound parameter")
+    void executeQuery_returnsMatchingRows() throws SQLException {
+        List<String> names = wrapper.executeQuery(
+                "SELECT name FROM users WHERE age > ? ORDER BY name",
+                List.of(20),
+                rs -> rs.getString("name"));
 
-            // Act
-            List<String> results = jdbcWrapper.executeQuery(query, parameters, mapper);
-
-            // Assert
-            assertEquals(1, results.size());
-            assertEquals("John Doe", results.get(0));
-            verify(statement).setParameter(1, 1);
-            verify(statement).executeQuery();
-            verify(statement).close();
-            verify(resultSet).close();
-        });
+        assertEquals(List.of("Alice Smith", "John Doe"), names);
     }
 
     @Test
-    void testExecuteUpdate_Success() {
-        // Arrange
-        String query = "UPDATE users SET name = ? WHERE id = ?";
-        List<Object> parameters = Arrays.asList("Jane Doe", 1);
-        assertDoesNotThrow(() -> {
-            when(connection.prepareStatement(query)).thenReturn(statement);
-            when(statement.executeUpdate()).thenReturn(1);
+    @DisplayName("executeQuery can map multiple columns of different types")
+    void executeQuery_mapsMultipleColumns() throws SQLException {
+        // Demonstrates the payoff of the refactor: the mapper sees the real
+        // ResultSet, so getInt/getString/etc. are all available with no adapter
+        // plumbing to extend.
+        List<String> rows = wrapper.executeQuery(
+                "SELECT id, name, age FROM users ORDER BY id",
+                List.of(),
+                rs -> rs.getInt("id") + ":" + rs.getString("name") + ":" + rs.getInt("age"));
 
-            // Act
-            int rowsAffected = jdbcWrapper.executeUpdate(query, parameters);
-
-            // Assert
-            assertEquals(1, rowsAffected);
-            verify(statement).setParameter(1, "Jane Doe");
-            verify(statement).setParameter(2, 1);
-            verify(statement).executeUpdate();
-            verify(statement).close();
-        });
+        assertEquals(List.of("1:John Doe:25", "2:Alice Smith:30", "3:Bob Jones:18"), rows);
     }
 
     @Test
-    void testAutoCloseable_CloseCalledInTryWithResources() {
-        assertDoesNotThrow(() -> {
-            when(connection.isClosed()).thenReturn(false);
-            try (JdbcWrapper wrapper = new JdbcWrapper(connection)) {
-                // No operations, just testing close
-            }
-            verify(connection).close();
-        });
+    @DisplayName("executeQuery returns an empty list when nothing matches")
+    void executeQuery_noMatches_returnsEmptyList() throws SQLException {
+        List<String> names = wrapper.executeQuery(
+                "SELECT name FROM users WHERE age > ?",
+                List.of(100),
+                rs -> rs.getString("name"));
+
+        assertTrue(names.isEmpty());
     }
 
     @Test
-    void testAutoCloseable_ConnectionAlreadyClosed_NoCloseCalled() {
-        assertDoesNotThrow(() -> {
-            when(connection.isClosed()).thenReturn(true);
-            try (JdbcWrapper wrapper = new JdbcWrapper(connection)) {
-                // No operations
-            }
-            verify(connection, never()).close();
-        });
+    @DisplayName("executeUpdate persists changes and reports the affected row count")
+    void executeUpdate_persistsAndReturnsRowCount() throws SQLException {
+        int rowsAffected = wrapper.executeUpdate(
+                "UPDATE users SET name = ? WHERE id = ?",
+                List.of("Jane Doe", 1));
+
+        assertEquals(1, rowsAffected);
+
+        // Verify the change actually hit the database, not just a mock's memory.
+        List<String> name = wrapper.executeQuery(
+                "SELECT name FROM users WHERE id = ?",
+                List.of(1),
+                rs -> rs.getString("name"));
+        assertEquals(List.of("Jane Doe"), name);
     }
 
     @Test
-    void testConstructor_NullConnection_ThrowsException() {
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> new JdbcWrapper(null));
-        assertEquals("Connection cannot be null", exception.getMessage());
+    @DisplayName("null parameter list is treated as no parameters")
+    void executeQuery_nullParameters_isAllowed() throws SQLException {
+        List<Integer> ids = wrapper.executeQuery(
+                "SELECT id FROM users ORDER BY id",
+                null,
+                rs -> rs.getInt("id"));
+
+        assertEquals(List.of(1, 2, 3), ids);
     }
 
     @Test
-    void testExecuteQuery_SQLException_Propagates() {
-        // Arrange
-        String query = "SELECT * FROM users WHERE id = ?";
-        List<Object> parameters = Arrays.asList(1);
-        JdbcWrapper.ResultSetMapper<String> mapper = rs -> rs.getString("name");
-        assertDoesNotThrow(() -> {
-            when(connection.prepareStatement(query)).thenThrow(new SQLException("Database error"));
-
-            // Act & Assert
-            SQLException exception = assertThrows(SQLException.class, () -> jdbcWrapper.executeQuery(query, parameters, mapper));
-            assertEquals("Database error", exception.getMessage());
-        });
+    @DisplayName("a genuinely invalid query surfaces a real SQLException")
+    void executeQuery_invalidSql_throwsSQLException() {
+        // No mock needed to simulate a failure: the real database rejects it.
+        assertThrows(SQLException.class, () -> wrapper.executeQuery(
+                "SELECT name FROM table_that_does_not_exist",
+                List.of(),
+                rs -> rs.getString("name")));
     }
 
+    @Test
+    @DisplayName("constructor rejects a null connection")
+    void constructor_nullConnection_throws() {
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> new JdbcWrapper(null));
+        assertEquals("Connection cannot be null", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("close() closes the underlying connection")
+    void close_closesUnderlyingConnection() throws SQLException {
+        assertFalse(connection.isClosed());
+        wrapper.close();
+        assertTrue(connection.isClosed());
+    }
+
+    @Test
+    @DisplayName("close() is idempotent when the connection is already closed")
+    void close_alreadyClosed_isNoOp() throws SQLException {
+        connection.close();
+        assertDoesNotThrow(() -> wrapper.close());
+    }
 }
