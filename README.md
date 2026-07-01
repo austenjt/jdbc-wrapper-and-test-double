@@ -117,12 +117,42 @@ letting the real database reject it — no mock needed to simulate failure.
 - JDK 25
 - Maven
 
+Key library versions: JUnit Jupiter **6.1.1** (via `junit-bom`), H2 2.2.224,
+PostgreSQL driver 42.7.3.
+
 ## Run
 
 ```bash
 mvn test          # run the H2-backed test suite
 mvn compile exec:java -Dexec.mainClass=org.example.Main   # or run the demo
 ```
+
+## HTML test report
+
+Note: JUnit itself does not generate HTML — its reporting module only emits XML
+(the legacy `TEST-*.xml` and the newer Open Test Reporting format). Gradle
+renders HTML from that XML automatically; Maven does it through the Surefire
+Report plugin. So the HTML here comes from Maven, not JUnit.
+
+**Automatic (default).** The Surefire Report plugin is bound to the `test`
+phase, so every run produces an HTML report with no extra command:
+
+```bash
+mvn test
+# open target/reports/surefire.html
+```
+
+Because it is bound to the `test` phase, the report is generated only when the
+tests pass. To produce a report even when some tests fail, let the build
+continue and then render from the XML that Surefire already wrote:
+
+```bash
+mvn test -Dmaven.test.failure.ignore=true
+# open target/reports/surefire.html
+```
+
+The report is self-contained under `target/reports/` (its CSS lives alongside
+`surefire.html`), so just open that file in a browser.
 
 ## Where to go next: higher-fidelity integration tests
 
