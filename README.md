@@ -76,12 +76,12 @@ Each piece of that URL is doing a job:
 - `DB_CLOSE_DELAY=-1` — keeps the in-memory database alive for the lifetime of
   the connection rather than discarding it after the first statement.
 
-`@BeforeEach` opens that connection, creates a small `users` table and seeds a
-few rows; `@AfterEach` closes the connection, which drops the in-memory
-database. From there the tests call the wrapper exactly as production code
-would and assert on the results. Real SQL runs, real parameters bind, and a bad
-query (`SELECT ... FROM table_that_does_not_exist`) throws a real `SQLException`
-— no `when(...).thenReturn(...)` staging required.
+A Cucumber `Background` step opens that connection, creates a small `users`
+table and seeds a few rows; an `@After` hook closes the connection, which drops
+the in-memory database. From there each scenario calls the wrapper exactly as
+production code would and asserts on the results. Real SQL runs, real parameters
+bind, and a bad query (`SELECT ... FROM table_that_does_not_exist`) throws a
+real `SQLException` — no `when(...).thenReturn(...)` staging required.
 
 ## Why a fake, not a mock
 
@@ -105,54 +105,59 @@ So `JdbcWrapper` now wraps `java.sql.Connection` directly, and the mapper
 receives the real `ResultSet` (giving full access to `getInt`, `getString`,
 etc. with no adapter plumbing to extend).
 
-## The tests
+## The tests are behaviour specifications (BDD with Cucumber)
 
-`JdbcWrapperTest` spins up a fresh, uniquely-named in-memory H2 database per
-test in **PostgreSQL compatibility mode** (`MODE=PostgreSQL`), seeds a small
-`users` table, and runs the wrapper against it. An invalid query is tested by
-letting the real database reject it — no mock needed to simulate failure.
+Instead of example-based JUnit methods, the behaviour of `JdbcWrapper` is
+described in plain English in a Gherkin feature file, which doubles as living
+documentation:
+
+```
+src/test/resources/org/example/jdbc_wrapper.feature   # the spec (Given/When/Then)
+src/test/java/org/example/steps/JdbcWrapperSteps.java  # the Java glue behind each step
+src/test/java/org/example/RunCucumberTest.java         # JUnit Platform runner
+src/test/resources/junit-platform.properties           # Cucumber config
+```
+
+A scenario reads like documentation and executes like a test:
+
+```gherkin
+Scenario: An update changes the data and reports how many rows it touched
+  When I rename the user with id 1 to "Jane Doe"
+  Then 1 row is reported as updated
+  And the name of the user with id 1 is now "Jane Doe"
+```
+
+Every scenario runs against the real in-memory H2 fake described above. A
+`Scenario Outline` covers the age-filter boundaries with a table of examples.
 
 ## Requirements
 
 - JDK 25
 - Maven
 
-Key library versions: JUnit Jupiter **6.1.1** (via `junit-bom`), H2 2.2.224,
-PostgreSQL driver 42.7.3.
+Key library versions: Cucumber **7.34.4** (`cucumber-bom`), JUnit Platform
+**6.1.1** (`junit-bom`), H2 2.2.224, PostgreSQL driver 42.7.3.
 
 ## Run
 
 ```bash
-mvn test          # run the H2-backed test suite
+mvn test          # run the behaviour scenarios against the H2 fake
 mvn compile exec:java -Dexec.mainClass=org.example.Main   # or run the demo
 ```
 
-## HTML test report
+## HTML report
 
-Note: JUnit itself does not generate HTML — its reporting module only emits XML
-(the legacy `TEST-*.xml` and the newer Open Test Reporting format). Gradle
-renders HTML from that XML automatically; Maven does it through the Surefire
-Report plugin. So the HTML here comes from Maven, not JUnit.
+The report is generated automatically by `mvn test` — the
+`maven-cucumber-reporting` plugin is bound to the `test` phase.
 
-**Automatic (default).** The Surefire Report plugin is bound to the `test`
-phase, so every run produces an HTML report with no extra command:
+- **Rich, browsable report** (feature overview, per-scenario steps, pass/fail,
+  timings, tags): open
+  `target/cucumber-html-reports/overview-features.html`.
+- **Self-contained single file** (produced by Cucumber's built-in `html`
+  plugin, handy for emailing): `target/cucumber-reports/cucumber.html`.
 
-```bash
-mvn test
-# open target/reports/surefire.html
-```
-
-Because it is bound to the `test` phase, the report is generated only when the
-tests pass. To produce a report even when some tests fail, let the build
-continue and then render from the XML that Surefire already wrote:
-
-```bash
-mvn test -Dmaven.test.failure.ignore=true
-# open target/reports/surefire.html
-```
-
-The report is self-contained under `target/reports/` (its CSS lives alongside
-`surefire.html`), so just open that file in a browser.
+Because the report is driven by Gherkin, it reads as documentation of what
+`JdbcWrapper` does — not just a list of green checkmarks.
 
 ## Where to go next: higher-fidelity integration tests
 

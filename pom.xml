@@ -11,11 +11,12 @@
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <cucumber.version>7.34.4</cucumber.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <!-- JUnit 6 BOM: keeps all JUnit artifacts on one consistent version. -->
+            <!-- JUnit 6 BOM: keeps all JUnit Platform artifacts on one version. -->
             <dependency>
                 <groupId>org.junit</groupId>
                 <artifactId>junit-bom</artifactId>
@@ -23,14 +24,40 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Cucumber BOM: keeps all Cucumber artifacts on one version. -->
+            <dependency>
+                <groupId>io.cucumber</groupId>
+                <artifactId>cucumber-bom</artifactId>
+                <version>${cucumber.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
-        <!-- JUnit Jupiter (aggregator: API + params + engine). Version from the BOM. -->
+        <!-- Cucumber: Gherkin feature files + Java step definitions. -->
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-java</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Runs Cucumber as a JUnit Platform test engine. -->
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-junit-platform-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Lets a @Suite class discover and launch the feature files. -->
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-suite</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- JUnit Jupiter Assertions, used inside the step definitions. -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>junit-jupiter-api</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -74,21 +101,31 @@
                 </configuration>
             </plugin>
 
-            <!-- Renders an HTML report from the Surefire XML results.
-                 Bound to the test phase so a plain `mvn test` produces it
-                 automatically at target/reports/surefire.html (CSS/images are
-                 emitted alongside it). No extra command or Python needed. -->
+            <!-- Turns Cucumber's JSON output into a rich, browsable HTML report:
+                 feature overview, per-scenario steps, pass/fail, timings, tags.
+                 Bound after the tests so `mvn test` produces it automatically at
+                 target/cucumber-html-reports/overview-features.html -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-report-plugin</artifactId>
-                <version>3.5.2</version>
+                <groupId>net.masterthought</groupId>
+                <artifactId>maven-cucumber-reporting</artifactId>
+                <version>5.11.0</version>
                 <executions>
                     <execution>
-                        <id>html-report</id>
+                        <id>cucumber-html-report</id>
                         <phase>test</phase>
                         <goals>
-                            <goal>report-only</goal>
+                            <goal>generate</goal>
                         </goals>
+                        <configuration>
+                            <projectName>JdbcWrapper — behaviour</projectName>
+                            <!-- The plugin creates its own "cucumber-html-reports"
+                                 subfolder under this directory. -->
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                            <inputDirectory>${project.build.directory}/cucumber-reports</inputDirectory>
+                            <jsonFiles>
+                                <param>**/*.json</param>
+                            </jsonFiles>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
