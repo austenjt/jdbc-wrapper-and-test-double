@@ -108,14 +108,17 @@ etc. with no adapter plumbing to extend).
 ## The tests are behaviour specifications (BDD with Cucumber)
 
 Instead of example-based JUnit methods, the behaviour of `JdbcWrapper` is
-described in plain English in a Gherkin feature file, which doubles as living
-documentation:
+described in plain English in Gherkin feature files, which double as living
+documentation. The scenarios are split by concern, each feature carrying its
+own `Background`:
 
 ```
-src/test/resources/org/example/jdbc_wrapper.feature   # the spec (Given/When/Then)
-src/test/java/org/example/steps/JdbcWrapperSteps.java  # the Java glue behind each step
-src/test/java/org/example/RunCucumberTest.java         # JUnit Platform runner
-src/test/resources/junit-platform.properties           # Cucumber config
+src/test/resources/org/example/querying_users.feature       # SELECTs + row mapping
+src/test/resources/org/example/updating_users.feature       # UPDATE + row counts
+src/test/resources/org/example/connection_and_errors.feature # lifecycle + errors
+src/test/java/org/example/steps/JdbcWrapperSteps.java        # the Java glue behind each step
+src/test/java/org/example/RunCucumberTest.java               # JUnit Platform runner
+src/test/resources/junit-platform.properties                # Cucumber config
 ```
 
 A scenario reads like documentation and executes like a test:

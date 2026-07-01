@@ -59,9 +59,11 @@ public class JdbcWrapperSteps {
         wrapper = new JdbcWrapper(connection);
     }
 
-    @Given("the wrapper's connection is open")
-    public void the_wrapper_s_connection_is_open() throws SQLException {
-        assertFalse(connection.isClosed(), "connection should start open");
+    @Given("an open connection to an empty database")
+    public void an_open_connection_to_an_empty_database() throws SQLException {
+        String url = "jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
+        connection = DriverManager.getConnection(url, "sa", "");
+        wrapper = new JdbcWrapper(connection);
     }
 
     // --- When ------------------------------------------------------------
